@@ -30,3 +30,28 @@ jobs:
       - run: gh release create "$GITHUB_REF_NAME" translit-*.tgz --verify-tag --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
+  profile:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: строка версии в Profile README (шаг курса)
+        env:
+          GH_TOKEN: ${{ secrets.PROFILE_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${OWNER}/${OWNER}.git" profile
+          cd profile
+          line="${REPO} — ${GITHUB_REF_NAME}"
+          if grep -q "^${REPO} — v" README.md; then
+            sed -i "s/^${REPO} — v.*/${line}/" README.md
+          else
+            printf '\n%s\n' "$line" >> README.md
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git diff --cached --quiet && { echo "строка версии уже такая"; exit 0; }
+          git commit -m "chore: ${REPO} ${GITHUB_REF_NAME}"
+          git push
